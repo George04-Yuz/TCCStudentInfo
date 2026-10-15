@@ -374,6 +374,7 @@ export default function App() {
               onUpdateUser={handleStudentSelfProfileUpdate}
               activeTab={activeTab}
               onSelectTab={setActiveTab}
+              students={students}
             />
           )}
 

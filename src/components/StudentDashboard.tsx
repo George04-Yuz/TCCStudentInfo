@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, PushNotification } from '../types';
+import { User, PushNotification, Student, Department, ClassScheduleItem } from '../types';
 import { initialDepartmentSchedules } from '../data/curriculumData';
+import { initialStudents } from '../data/mockData';
 import jsPDF from 'jspdf';
 import {
   ResponsiveContainer,
@@ -49,54 +50,266 @@ interface StudentDashboardProps {
   onUpdateUser?: (updatedUser: Partial<User>) => void;
   activeTab?: string;
   onSelectTab?: (tab: string) => void;
+  students?: Student[];
 }
 
-interface ScheduleItem {
-  timeSlot: string;
+type ScheduleItem = ClassScheduleItem;
+
+interface ScheduledAssessmentInfo {
   code: string;
-  title: string;
-  section: string;
-  timeRange: string;
+  courseTitle: string;
+  examType: string;
+  dateStr: string;
   room: string;
-  instructor: string;
-  day: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday';
-  color: string;
+  proctor: string;
+  syllabusCode: string;
 }
 
-// Dynamic ALL_SCHEDULES derived from student department inside StudentDashboard component
+export const DEPARTMENT_ASSESSMENTS: Record<Department, ScheduledAssessmentInfo> = {
+  'BS Criminology': {
+    code: 'CDI 1',
+    courseTitle: 'Fundamentals of Criminal Investigation',
+    examType: 'Midterm Examination',
+    dateStr: 'August 18, 2026 • 9:00 AM - 10:30 AM',
+    room: 'Crime Scene Lab 1',
+    proctor: 'Capt. Danilo "Danny" Fernandez, RCrim',
+    syllabusCode: 'CDI 1',
+  },
+  'BS Business Administration': {
+    code: 'BA-CORE 1',
+    courseTitle: 'Principles of Management & Organization',
+    examType: 'Midterm Examination',
+    dateStr: 'August 18, 2026 • 8:00 AM - 9:30 AM',
+    room: 'Business Hall 101',
+    proctor: 'Prof. Paolo Vergara Bote, MBA, CPA',
+    syllabusCode: 'BA-CORE 1',
+  },
+  'BS Information Technology': {
+    code: 'ITCC 5',
+    courseTitle: 'Information Management & Architecture',
+    examType: 'Midterm Examination',
+    dateStr: 'August 18, 2026 • 9:00 AM - 10:30 AM',
+    room: 'Lab 1 (Computer Center)',
+    proctor: 'Prof. April Jean D. Villas',
+    syllabusCode: 'ITCC 5',
+  },
+};
 
-const MY_GRADES_DATA = [
-  { code: 'GE 5', desc: 'Purposive Communication', units: 3, prelim: 88, midterm: 90, final: 91, status: 'Passed' },
-  { code: 'GE 6', desc: 'Art Appreciation', units: 3, prelim: 92, midterm: 94, final: 95, status: 'Passed' },
-  { code: 'GEE 3', desc: 'Reading Visual Art', units: 3, prelim: 85, midterm: 88, final: 90, status: 'Passed' },
-  { code: 'ITAPDC 1', desc: 'System Analysis and Design', units: 3, prelim: 90, midterm: 91, final: 93, status: 'Passed' },
-  { code: 'ITAPDC 2', desc: 'Integrated Application Software', units: 3, prelim: 87, midterm: 89, final: 92, status: 'Passed' },
-  { code: 'ITCC 5', desc: 'Information Management', units: 3, prelim: 95, midterm: 96, final: 98, status: 'Passed' },
-  { code: 'ITPC 2', desc: 'Discrete Mathematics', units: 3, prelim: 82, midterm: 85, final: 89, status: 'Passed' },
-  { code: 'ITPE 1', desc: 'Professional Elective 1: OOP', units: 3, prelim: 91, midterm: 93, final: 96, status: 'Passed' },
-  { code: 'PE 3', desc: 'PATH-FIT 3: Martial Arts', units: 2, prelim: 98, midterm: 98, final: 99, status: 'Passed' },
-];
+export const DEPARTMENT_GRADES_DATA: Record<
+  Department,
+  Array<{ code: string; desc: string; units: number; prelim: number; midterm: number; final: number; status: string }>
+> = {
+  'BS Criminology': [
+    { code: 'CDI 1', desc: 'Fundamentals of Criminal Investigation', units: 3, prelim: 91, midterm: 93, final: 94, status: 'Passed' },
+    { code: 'FORENSIC 1', desc: 'Forensic Photography & Evidence', units: 3, prelim: 89, midterm: 91, final: 92, status: 'Passed' },
+    { code: 'FORENSIC 2', desc: 'Personal Identification & Dactyloscopy', units: 3, prelim: 94, midterm: 96, final: 97, status: 'Passed' },
+    { code: 'CRIMLAW 1', desc: 'Criminal Law: Book 1 (RPC)', units: 3, prelim: 88, midterm: 90, final: 92, status: 'Passed' },
+    { code: 'CRIM 1', desc: 'Introduction to Criminology', units: 3, prelim: 92, midterm: 94, final: 95, status: 'Passed' },
+    { code: 'CA 1', desc: 'Institutional Corrections & Penology', units: 3, prelim: 87, midterm: 89, final: 91, status: 'Passed' },
+    { code: 'LEA 1', desc: 'Law Enforcement Organization & Admin', units: 3, prelim: 90, midterm: 92, final: 93, status: 'Passed' },
+    { code: 'MARKSMAN 1', desc: 'Combat Marksmanship & Firearms', units: 2, prelim: 96, midterm: 98, final: 98, status: 'Passed' },
+    { code: 'GE 5', desc: 'Purposive Communication', units: 3, prelim: 88, midterm: 90, final: 91, status: 'Passed' },
+  ],
+  'BS Business Administration': [
+    { code: 'BA-CORE 1', desc: 'Principles of Management & Organization', units: 3, prelim: 90, midterm: 92, final: 94, status: 'Passed' },
+    { code: 'BA-FIN 1', desc: 'Financial Management & Corporate Finance', units: 3, prelim: 91, midterm: 93, final: 95, status: 'Passed' },
+    { code: 'BA-ECON 1', desc: 'Managerial Economics & Micro-Analysis', units: 3, prelim: 88, midterm: 90, final: 92, status: 'Passed' },
+    { code: 'BA-MKTG 1', desc: 'Strategic Marketing Management', units: 3, prelim: 93, midterm: 95, final: 96, status: 'Passed' },
+    { code: 'BA-BACC 1', desc: 'Basic Accounting for Business Decisions', units: 3, prelim: 86, midterm: 89, final: 91, status: 'Passed' },
+    { code: 'BA-HRM 1', desc: 'Human Resource Management & Relations', units: 3, prelim: 92, midterm: 94, final: 95, status: 'Passed' },
+    { code: 'BA-LAW 1', desc: 'Law on Obligations & Business Law', units: 3, prelim: 89, midterm: 91, final: 93, status: 'Passed' },
+    { code: 'BA-ENTREP', desc: 'Entrepreneurial Feasibility & Pitching', units: 3, prelim: 90, midterm: 93, final: 95, status: 'Passed' },
+    { code: 'GE 5', desc: 'Purposive Communication', units: 3, prelim: 88, midterm: 90, final: 91, status: 'Passed' },
+  ],
+  'BS Information Technology': [
+    { code: 'GE 5', desc: 'Purposive Communication', units: 3, prelim: 88, midterm: 90, final: 91, status: 'Passed' },
+    { code: 'GE 6', desc: 'Art Appreciation', units: 3, prelim: 92, midterm: 94, final: 95, status: 'Passed' },
+    { code: 'GEE 3', desc: 'Reading Visual Art', units: 3, prelim: 85, midterm: 88, final: 90, status: 'Passed' },
+    { code: 'ITAPDC 1', desc: 'System Analysis and Design', units: 3, prelim: 90, midterm: 91, final: 93, status: 'Passed' },
+    { code: 'ITAPDC 2', desc: 'Integrated Application Software', units: 3, prelim: 87, midterm: 89, final: 92, status: 'Passed' },
+    { code: 'ITCC 5', desc: 'Information Management', units: 3, prelim: 95, midterm: 96, final: 98, status: 'Passed' },
+    { code: 'ITPC 2', desc: 'Discrete Mathematics', units: 3, prelim: 82, midterm: 85, final: 89, status: 'Passed' },
+    { code: 'ITPE 1', desc: 'Professional Elective 1: OOP', units: 3, prelim: 91, midterm: 93, final: 96, status: 'Passed' },
+    { code: 'PE 3', desc: 'PATH-FIT 3: Martial Arts', units: 2, prelim: 98, midterm: 98, final: 99, status: 'Passed' },
+  ],
+};
 
-const MY_ATTENDANCE_DATA = [
-  { code: 'ITCC 5', course: 'Information Management', present: 14, absent: 0, late: 1, percentage: 96 },
-  { code: 'ITAPDC 1', course: 'System Analysis and Design', present: 12, absent: 0, late: 0, percentage: 100 },
-  { code: 'GE 5', course: 'Purposive Communication', present: 10, absent: 0, late: 0, percentage: 100 },
-  { code: 'ITPC 2', course: 'Discrete Mathematics', present: 11, absent: 1, late: 0, percentage: 92 },
-  { code: 'PE 3', course: 'PATH-FIT 3: Martial Arts', present: 8, absent: 0, late: 0, percentage: 100 },
-];
+export const DEPARTMENT_ATTENDANCE_DATA: Record<
+  Department,
+  Array<{ code: string; course: string; present: number; absent: number; late: number; percentage: number }>
+> = {
+  'BS Criminology': [
+    { code: 'CDI 1', course: 'Fundamentals of Criminal Investigation', present: 14, absent: 0, late: 1, percentage: 96 },
+    { code: 'FORENSIC 2', course: 'Personal Identification & Dactyloscopy', present: 15, absent: 0, late: 0, percentage: 100 },
+    { code: 'CRIMLAW 1', course: 'Criminal Law: Book 1 (RPC)', present: 13, absent: 1, late: 0, percentage: 93 },
+    { code: 'CRIM 1', course: 'Introduction to Criminology', present: 12, absent: 0, late: 0, percentage: 100 },
+    { code: 'MARKSMAN 1', course: 'Combat Marksmanship & Firearms', present: 8, absent: 0, late: 0, percentage: 100 },
+  ],
+  'BS Business Administration': [
+    { code: 'BA-CORE 1', course: 'Principles of Management & Organization', present: 14, absent: 0, late: 1, percentage: 96 },
+    { code: 'BA-FIN 1', course: 'Financial Management & Corporate Finance', present: 12, absent: 0, late: 0, percentage: 100 },
+    { code: 'BA-ECON 1', course: 'Managerial Economics & Micro-Analysis', present: 11, absent: 1, late: 0, percentage: 92 },
+    { code: 'BA-MKTG 1', course: 'Strategic Marketing Management', present: 13, absent: 0, late: 0, percentage: 100 },
+    { code: 'BA-LAW 1', course: 'Law on Obligations & Business Law', present: 9, absent: 0, late: 0, percentage: 100 },
+  ],
+  'BS Information Technology': [
+    { code: 'ITCC 5', course: 'Information Management', present: 14, absent: 0, late: 1, percentage: 96 },
+    { code: 'ITAPDC 1', course: 'System Analysis and Design', present: 12, absent: 0, late: 0, percentage: 100 },
+    { code: 'GE 5', course: 'Purposive Communication', present: 10, absent: 0, late: 0, percentage: 100 },
+    { code: 'ITPC 2', course: 'Discrete Mathematics', present: 11, absent: 1, late: 0, percentage: 92 },
+    { code: 'PE 3', course: 'PATH-FIT 3: Martial Arts', present: 8, absent: 0, late: 0, percentage: 100 },
+  ],
+};
+
+export const DEPARTMENT_GPA_TREND: Record<
+  Department,
+  {
+    trend: Array<{ period: string; gpa: number; averagePct: number; status: string }>;
+    standing: string;
+  }
+> = {
+  'BS Criminology': {
+    trend: [
+      { period: 'Prelim', gpa: 1.15, averagePct: 94.5, status: 'Passed' },
+      { period: 'Midterm', gpa: 1.05, averagePct: 96.8, status: 'Passed' },
+      { period: 'Semifinal', gpa: 1.02, averagePct: 97.5, status: 'Passed' },
+      { period: 'Finals', gpa: 1.00, averagePct: 98.5, status: 'Summa Cum Laude' },
+    ],
+    standing: 'Summa Cum Laude',
+  },
+  'BS Business Administration': {
+    trend: [
+      { period: 'Prelim', gpa: 1.60, averagePct: 90.0, status: 'Passed' },
+      { period: 'Midterm', gpa: 1.50, averagePct: 92.2, status: 'Passed' },
+      { period: 'Semifinal', gpa: 1.40, averagePct: 93.8, status: 'Passed' },
+      { period: 'Finals', gpa: 1.35, averagePct: 94.6, status: 'Cum Laude' },
+    ],
+    standing: 'Cum Laude',
+  },
+  'BS Information Technology': {
+    trend: [
+      { period: 'Prelim', gpa: 1.50, averagePct: 91.5, status: 'Passed' },
+      { period: 'Midterm', gpa: 1.35, averagePct: 93.8, status: 'Passed' },
+      { period: 'Semifinal', gpa: 1.28, averagePct: 95.0, status: 'Passed' },
+      { period: 'Finals', gpa: 1.25, averagePct: 96.2, status: 'Magna Cum Laude' },
+    ],
+    standing: 'Magna Cum Laude',
+  },
+};
+
+export const DEPARTMENT_NOTIFICATIONS: Record<
+  Department,
+  Array<{ id: string; title: string; message: string; time: string; type: 'grade' | 'reminder' | 'system'; read: boolean }>
+> = {
+  'BS Criminology': [
+    {
+      id: 'sn-c1',
+      title: 'New Grade Posted: CDI 1',
+      message: 'Capt. Danilo "Danny" Fernandez posted your Midterm grade: 93% (Passed).',
+      time: '10 mins ago',
+      type: 'grade',
+      read: false,
+    },
+    {
+      id: 'sn-c2',
+      title: 'Upcoming Class Reminder',
+      message: 'Fundamentals of Criminal Investigation (CDI 1) starts in 30 mins in Crime Scene Lab 1.',
+      time: '25 mins ago',
+      type: 'reminder',
+      read: false,
+    },
+    {
+      id: 'sn-c3',
+      title: 'Attendance Recorded',
+      message: 'Marked Present in FORENSIC 2 Personal Identification & Dactyloscopy.',
+      time: '2 hours ago',
+      type: 'system',
+      read: true,
+    },
+    {
+      id: 'sn-c4',
+      title: 'Midterm Assessment Advisory',
+      message: 'CDI 1 Midterm Examination schedule and proctor roster are now confirmed.',
+      time: '1 day ago',
+      type: 'reminder',
+      read: true,
+    },
+  ],
+  'BS Business Administration': [
+    {
+      id: 'sn-b1',
+      title: 'New Grade Posted: BA-CORE 1',
+      message: 'Prof. Paolo Vergara Bote posted your Midterm grade: 92% (Passed).',
+      time: '10 mins ago',
+      type: 'grade',
+      read: false,
+    },
+    {
+      id: 'sn-b2',
+      title: 'Upcoming Class Reminder',
+      message: 'Principles of Management (BA-CORE 1) starts in 30 mins in Business Hall 101.',
+      time: '25 mins ago',
+      type: 'reminder',
+      read: false,
+    },
+    {
+      id: 'sn-b3',
+      title: 'Attendance Recorded',
+      message: 'Marked Present in BA-FIN 1 Financial Management.',
+      time: '2 hours ago',
+      type: 'system',
+      read: true,
+    },
+    {
+      id: 'sn-b4',
+      title: 'Midterm Assessment Advisory',
+      message: 'BA-CORE 1 Midterm Examination schedule and room assignments are now active.',
+      time: '1 day ago',
+      type: 'reminder',
+      read: true,
+    },
+  ],
+  'BS Information Technology': [
+    {
+      id: 'sn-1',
+      title: 'New Grade Posted: ITCC 5',
+      message: 'April Jean D. Villas posted your Midterm grade: 96% (Passed).',
+      time: '10 mins ago',
+      type: 'grade',
+      read: false,
+    },
+    {
+      id: 'sn-2',
+      title: 'Upcoming Class Reminder',
+      message: 'System Analysis & Design (ITAPDC 1) starts in 30 mins in Lab 2.',
+      time: '25 mins ago',
+      type: 'reminder',
+      read: false,
+    },
+    {
+      id: 'sn-3',
+      title: 'Attendance Recorded',
+      message: 'Marked Present in GE 6 Art Appreciation.',
+      time: '2 hours ago',
+      type: 'system',
+      read: true,
+    },
+    {
+      id: 'sn-4',
+      title: 'Final Examination Schedule Released',
+      message: 'Midterm & Final exam timetables for 2nd Semester 2026 are now active.',
+      time: '1 day ago',
+      type: 'reminder',
+      read: true,
+    },
+  ],
+};
 
 const PRESET_AVATARS = [
   'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
   'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-];
-
-const GPA_TREND_DATA = [
-  { period: 'Prelim', gpa: 1.50, averagePct: 91.5, status: 'Passed' },
-  { period: 'Midterm', gpa: 1.35, averagePct: 93.8, status: 'Passed' },
-  { period: 'Semifinal', gpa: 1.28, averagePct: 95.0, status: 'Passed' },
-  { period: 'Finals', gpa: 1.25, averagePct: 96.2, status: 'Magna Cum Laude' },
 ];
 
 const SYLLABUS_DATA: Record<string, {
@@ -113,6 +326,364 @@ const SYLLABUS_DATA: Record<string, {
   gradingScheme: { category: string; weight: number }[];
   prerequisites: string;
 }> = {
+  // Criminology Syllabi
+  'CDI 1': {
+    code: 'CDI 1',
+    title: 'Fundamentals of Criminal Investigation',
+    department: 'BS Criminology',
+    units: 3,
+    instructorName: 'Capt. Danilo "Danny" Fernandez, RCrim',
+    instructorEmail: 'd.fernandez@tcc.edu',
+    officeLocation: 'Forensics Complex, Lab 4',
+    consultationHours: 'Mon & Wed 10:00 AM - 12:00 PM',
+    description: 'Covers core investigative protocols, crime scene management, physical evidence handling, cordon establishment, and chain of custody documentation.',
+    objectives: [
+      'Master Golden Rule of Crime Scene Investigation and cordon preservation protocols.',
+      'Execute photographic sketching, note taking, and systematic physical evidence recovery.',
+      'Prepare comprehensive spot reports, progress reports, and final investigation dockets.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'CRIM 1 (Introduction to Criminology)'
+  },
+  'FORENSIC 1': {
+    code: 'FORENSIC 1',
+    title: 'Forensic Photography & Evidence',
+    department: 'BS Criminology',
+    units: 3,
+    instructorName: 'Capt. Danilo "Danny" Fernandez, RCrim',
+    instructorEmail: 'd.fernandez@tcc.edu',
+    officeLocation: 'Forensic Darkroom, Ground Floor',
+    consultationHours: 'Tue & Thu 1:00 PM - 3:00 PM',
+    description: 'Scientific application of photography in criminalistics, camera optics, specialized lighting techniques, ultraviolet fluorescence, and courtroom presentation.',
+    objectives: [
+      'Operate manual SLR forensic cameras across diverse atmospheric and nocturnal conditions.',
+      'Capture admissible macro-scale photographs of latent impressions and ballistic striations.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+  'FORENSIC 2': {
+    code: 'FORENSIC 2',
+    title: 'Personal Identification & Dactyloscopy',
+    department: 'BS Criminology',
+    units: 3,
+    instructorName: 'Capt. Danilo "Danny" Fernandez, RCrim',
+    instructorEmail: 'd.fernandez@tcc.edu',
+    officeLocation: 'Dactyloscopy Studio, Room 102',
+    consultationHours: 'Mon & Wed 1:00 PM - 3:00 PM',
+    description: 'Henry System of fingerprint classification, ridge minutiae identification, chemical lifting of latent prints, and automated fingerprint identification systems (AFIS).',
+    objectives: [
+      'Classify 10-fingerprint cards using primary, secondary, and sub-secondary Henry formulas.',
+      'Develop latent impressions utilizing cyanoacrylate fuming and magnetic powders.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'FORENSIC 1'
+  },
+  'CRIMLAW 1': {
+    code: 'CRIMLAW 1',
+    title: 'Criminal Law: Book 1 (Revised Penal Code)',
+    department: 'BS Criminology',
+    units: 3,
+    instructorName: 'Atty. Maria Teresa Gutierrez',
+    instructorEmail: 'mt.gutierrez@tcc.edu',
+    officeLocation: 'Moot Court Chamber, Room 102',
+    consultationHours: 'Fri 9:00 AM - 12:00 PM',
+    description: 'General principles of penal law, felonies, criminal liability, justifying and exempting circumstances, modifying circumstances, and penalties.',
+    objectives: [
+      'Analyze elements of criminal liability under Act No. 3815 (RPC) as amended.',
+      'Evaluate courtroom jurisprudence regarding self-defense, alibi, and mitigating factors.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+  'CRIM 1': {
+    code: 'CRIM 1',
+    title: 'Introduction to Criminology',
+    department: 'BS Criminology',
+    units: 3,
+    instructorName: 'Major Chairel Rafaila, MSCrim, CSP',
+    instructorEmail: 'c.rafaila@tcc.edu',
+    officeLocation: 'Justice Hall, Room 201',
+    consultationHours: 'Tue & Thu 1:00 PM - 4:00 PM',
+    description: 'Sociological and psychological theories of crime causation, criminal behavior typologies, victimology, and comparative criminal justice systems.',
+    objectives: [
+      'Examine classical, positivist, and contemporary sociological theories of delinquency.',
+      'Critique contemporary approaches to crime prevention and offender reformation.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+  'CA 1': {
+    code: 'CA 1',
+    title: 'Institutional Corrections & Penology',
+    department: 'BS Criminology',
+    units: 3,
+    instructorName: 'Insp. Roland P. Macaraeg',
+    instructorEmail: 'r.macaraeg@tcc.edu',
+    officeLocation: 'Tactical Defense Armory, Room 10',
+    consultationHours: 'Wed & Fri 2:00 PM - 5:00 PM',
+    description: 'Custodial management in jail facilities, BJMP and BuCor operating guidelines, rehabilitation programs, and modern penological treatment.',
+    objectives: [
+      'Appraise standards of custody, classification, and humane treatment of persons deprived of liberty.',
+      'Design reintegration curricula for correctional rehabilitation facilities.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'CRIM 1'
+  },
+  'LEA 1': {
+    code: 'LEA 1',
+    title: 'Law Enforcement Organization & Admin',
+    department: 'BS Criminology',
+    units: 3,
+    instructorName: 'Major Chairel Rafaila, MSCrim, CSP',
+    instructorEmail: 'c.rafaila@tcc.edu',
+    officeLocation: 'Justice Hall, Room 201',
+    consultationHours: 'Tue & Thu 1:00 PM - 4:00 PM',
+    description: 'Structural organization and operational dynamics of the PNP, NAPOLCOM, and specialized national law enforcement agencies.',
+    objectives: [
+      'Master administrative guidelines established by RA 6975 and RA 8551.',
+      'Develop strategic precinct deployment plans based on crime mapping statistics.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+  'MARKSMAN 1': {
+    code: 'MARKSMAN 1',
+    title: 'Combat Marksmanship & Firearms',
+    department: 'BS Criminology',
+    units: 2,
+    instructorName: 'Insp. Roland P. Macaraeg',
+    instructorEmail: 'r.macaraeg@tcc.edu',
+    officeLocation: 'Firing Range Complex',
+    consultationHours: 'Wed & Fri 2:00 PM - 5:00 PM',
+    description: 'Firearms safety, mechanical functioning of service handguns and shotguns, stance, breath control, and tactical shooting drills.',
+    objectives: [
+      'Execute 4 cardinal rules of gun safety under high-stress simulator drills.',
+      'Achieve standard qualification scores on paper and reactive steel targets.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+
+  // BS Business Administration Syllabi
+  'BA-CORE 1': {
+    code: 'BA-CORE 1',
+    title: 'Principles of Management & Organization',
+    department: 'BS Business Administration',
+    units: 3,
+    instructorName: 'Prof. Paolo Vergara Bote, MBA, CPA',
+    instructorEmail: 'p.bote@tcc.edu',
+    officeLocation: 'Business Center, Hall 301',
+    consultationHours: 'Mon & Wed 1:00 PM - 4:00 PM',
+    description: 'Foundations of corporate management: planning, organizing, leading, controlling, corporate social responsibility, and strategic positioning.',
+    objectives: [
+      'Formulate strategic business plans addressing market volatility and consumer dynamics.',
+      'Evaluate organizational structures and leadership communication paradigms.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+  'BA-FIN 1': {
+    code: 'BA-FIN 1',
+    title: 'Financial Management & Corporate Finance',
+    department: 'BS Business Administration',
+    units: 3,
+    instructorName: 'Prof. Eduardo S. Tan, CPA, CMA',
+    instructorEmail: 'e.tan@tcc.edu',
+    officeLocation: 'Accountancy & Tax Lab, Room 305',
+    consultationHours: 'Mon & Wed 9:00 AM - 11:30 AM',
+    description: 'Capital structure analysis, valuation models, time value of money, working capital management, and investment feasibility appraisal.',
+    objectives: [
+      'Calculate Weighted Average Cost of Capital (WACC), Net Present Value (NPV), and IRR.',
+      'Perform financial statement ratio analysis for corporate solvency and profitability.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'BA-BACC 1'
+  },
+  'BA-ECON 1': {
+    code: 'BA-ECON 1',
+    title: 'Managerial Economics & Micro-Analysis',
+    department: 'BS Business Administration',
+    units: 3,
+    instructorName: 'Prof. Paolo Vergara Bote, MBA, CPA',
+    instructorEmail: 'p.bote@tcc.edu',
+    officeLocation: 'Business Center, Hall 301',
+    consultationHours: 'Mon & Wed 1:00 PM - 4:00 PM',
+    description: 'Demand forecasting, production theory, cost functions, market structure analysis (perfect competition, oligopoly, monopoly), and pricing strategies.',
+    objectives: [
+      'Model price elasticity of demand and marginal revenue curves for optimal pricing.',
+      'Analyze market equilibrium under imperfect competitive market dynamics.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+  'BA-MKTG 1': {
+    code: 'BA-MKTG 1',
+    title: 'Strategic Marketing Management',
+    department: 'BS Business Administration',
+    units: 3,
+    instructorName: 'Dr. Melissa D. Roxas, DBA',
+    instructorEmail: 'm.roxas@tcc.edu',
+    officeLocation: 'Innovation Incubator, Suite B',
+    consultationHours: 'Tue & Thu 10:00 AM - 1:00 PM',
+    description: 'Market segmentation, targeting, positioning (STP), digital omnichannel marketing, customer lifetime value, and brand identity development.',
+    objectives: [
+      'Develop data-driven marketing campaigns optimizing customer acquisition costs.',
+      'Execute comprehensive market segmentation and customer journey mapping.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'BA-CORE 1'
+  },
+  'BA-BACC 1': {
+    code: 'BA-BACC 1',
+    title: 'Basic Accounting for Business Decisions',
+    department: 'BS Business Administration',
+    units: 3,
+    instructorName: 'Prof. Eduardo S. Tan, CPA, CMA',
+    instructorEmail: 'e.tan@tcc.edu',
+    officeLocation: 'Accountancy & Tax Lab, Room 305',
+    consultationHours: 'Mon & Wed 9:00 AM - 11:30 AM',
+    description: 'The accounting cycle, journal entries, ledger posting, trial balance, adjusting entries, and financial statements preparation.',
+    objectives: [
+      'Record business transactions applying double-entry bookkeeping rules.',
+      'Prepare statement of financial position and statement of comprehensive income.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+  'BA-HRM 1': {
+    code: 'BA-HRM 1',
+    title: 'Human Resource Management & Relations',
+    department: 'BS Business Administration',
+    units: 3,
+    instructorName: 'Dr. Melissa D. Roxas, DBA',
+    instructorEmail: 'm.roxas@tcc.edu',
+    officeLocation: 'Innovation Incubator, Suite B',
+    consultationHours: 'Tue & Thu 10:00 AM - 1:00 PM',
+    description: 'Talent recruitment, compensation architectures, performance appraisal systems, Philippine Labor Code compliance, and labor union relations.',
+    objectives: [
+      'Design structured recruitment, onboarding, and KPI appraisal workflows.',
+      'Evaluate Philippine labor laws concerning employee rights, due process, and benefits.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'BA-CORE 1'
+  },
+  'BA-LAW 1': {
+    code: 'BA-LAW 1',
+    title: 'Law on Obligations & Business Law',
+    department: 'BS Business Administration',
+    units: 3,
+    instructorName: 'Atty. Victorino C. Santos',
+    instructorEmail: 'v.santos@tcc.edu',
+    officeLocation: 'Legal Studies Wing, Room 210',
+    consultationHours: 'Fri 10:00 AM - 1:00 PM',
+    description: 'Philippine Civil Code provisions on obligations and contracts, corporate law, negotiable instruments, and commercial transactions.',
+    objectives: [
+      'Identify essential requisites of contracts and grounds for voidable or rescissible agreements.',
+      'Draft legally sound commercial service agreements and partnership bylaws.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'None'
+  },
+  'BA-ENTREP': {
+    code: 'BA-ENTREP',
+    title: 'Entrepreneurial Feasibility & Pitching',
+    department: 'BS Business Administration',
+    units: 3,
+    instructorName: 'Dr. Melissa D. Roxas, DBA',
+    instructorEmail: 'm.roxas@tcc.edu',
+    officeLocation: 'Incubator Pitch Room',
+    consultationHours: 'Tue & Thu 10:00 AM - 1:00 PM',
+    description: 'Ideation, Lean Canvas modeling, minimum viable product (MVP) validation, pitch deck storytelling, and investor funding rounds.',
+    objectives: [
+      'Conduct complete market validation studies for a scalable enterprise concept.',
+      'Present an investor-grade pitch deck to faculty and venture incubators.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'BA-CORE 1'
+  },
+
+  // BS Information Technology Syllabi
   'ITCC 5': {
     code: 'ITCC 5',
     title: 'Information Management & Architecture',
@@ -142,7 +713,7 @@ const SYLLABUS_DATA: Record<string, {
     title: 'System Analysis and Design',
     department: 'BS Information Technology',
     units: 3,
-    instructorName: 'Eng. R. Tandoc',
+    instructorName: 'Engr. Raymond Tandoc',
     instructorEmail: 'r.tandoc@tcc.edu.ph',
     officeLocation: 'Engineering & Technology Lab 2',
     consultationHours: 'Tuesday & Thursday: 1:00 PM - 3:00 PM',
@@ -160,6 +731,50 @@ const SYLLABUS_DATA: Record<string, {
       { category: 'Finals Assessment', weight: 30 }
     ],
     prerequisites: 'ITPC 2 (Discrete Mathematics)'
+  },
+  'ITAPDC 2': {
+    code: 'ITAPDC 2',
+    title: 'Integrated Application Software',
+    department: 'BS Information Technology',
+    units: 3,
+    instructorName: 'Engr. Raymond Tandoc',
+    instructorEmail: 'r.tandoc@tcc.edu.ph',
+    officeLocation: 'Cloud Lab 3',
+    consultationHours: 'Monday & Wednesday: 1:00 PM - 3:00 PM',
+    description: 'Full-stack enterprise application integration, RESTful API design, state synchronization, and secure microservices orchestration.',
+    objectives: [
+      'Build end-to-end cloud integrated software with robust API contracts.',
+      'Deploy CI/CD automated test pipelines and security auditing.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'ITAPDC 1'
+  },
+  'ITPE 1': {
+    code: 'ITPE 1',
+    title: 'OOP & Microservices Engineering',
+    department: 'BS Information Technology',
+    units: 3,
+    instructorName: 'Engr. Princess Jean Nebria Monsanto, MIT',
+    instructorEmail: 'pj.monsanto@tcc.edu',
+    officeLocation: 'Software Lab 4',
+    consultationHours: 'Tuesday & Thursday: 3:00 PM - 5:00 PM',
+    description: 'Advanced object-oriented programming patterns, dependency injection, containerization with Docker, and decoupled microservices architecture.',
+    objectives: [
+      'Implement Gang of Four design patterns in enterprise-grade software.',
+      'Containerize microservices and configure inter-service communication.'
+    ],
+    gradingScheme: [
+      { category: 'Prelim Assessment', weight: 20 },
+      { category: 'Midterm Assessment', weight: 25 },
+      { category: 'Semifinal Assessment', weight: 25 },
+      { category: 'Finals Assessment', weight: 30 }
+    ],
+    prerequisites: 'ITAPDC 1'
   },
   'GE 5': {
     code: 'GE 5',
@@ -211,7 +826,7 @@ const SYLLABUS_DATA: Record<string, {
     title: 'Discrete Mathematics',
     department: 'BS Information Technology',
     units: 3,
-    instructorName: 'Dr. E. Dela Cruz',
+    instructorName: 'Dr. Emmanuel Dela Cruz',
     instructorEmail: 'e.delacruz@tcc.edu.ph',
     officeLocation: 'Mathematics Faculty Office Room 204',
     consultationHours: 'Friday: 1:00 PM - 3:00 PM',
@@ -258,31 +873,31 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   onUpdateUser,
   activeTab: activeTabProp,
   onSelectTab,
+  students = [],
 }) => {
-  const mapPropToTab = (tab?: string): 'schedule' | 'timetable' | 'grades' | 'attendance' | 'profile' | 'notifications' => {
+  const mapPropToTab = (tab?: string): 'schedule' | 'timetable' | 'grades' | 'attendance' | 'profile' => {
     if (!tab) return 'schedule';
     if (tab === 'dashboard' || tab === 'schedule' || tab === 'news' || tab === 'admin') return 'schedule';
     if (tab === 'timetable') return 'timetable';
     if (tab === 'grades') return 'grades';
     if (tab === 'attendance') return 'attendance';
     if (tab === 'profile') return 'profile';
-    if (tab === 'notifications') return 'notifications';
     return 'schedule';
   };
 
-  const [internalTab, setInternalTab] = useState<'schedule' | 'timetable' | 'grades' | 'attendance' | 'profile' | 'notifications'>(
+  const [internalTab, setInternalTab] = useState<'schedule' | 'timetable' | 'grades' | 'attendance' | 'profile'>(
     mapPropToTab(activeTabProp)
   );
 
   useEffect(() => {
     if (activeTabProp) {
-      setInternalTab(mapPropToTab(activeTabProp) as any);
+      setInternalTab(mapPropToTab(activeTabProp));
     }
   }, [activeTabProp]);
 
   const activeTab = internalTab;
 
-  const setActiveTab = (tab: 'schedule' | 'timetable' | 'grades' | 'attendance' | 'profile' | 'notifications') => {
+  const setActiveTab = (tab: 'schedule' | 'timetable' | 'grades' | 'attendance' | 'profile') => {
     setInternalTab(tab);
     if (onSelectTab) {
       onSelectTab(tab);
@@ -441,29 +1056,99 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     },
   ]);
 
-  // Profile Form States
-  const name = currentUser.name || 'PAUL HARVEY AMPOYO';
-  const email = currentUser.email || 'paul.ampoyo@gmail.com';
-  const department = currentUser.department || 'BS Information Technology';
-  const ALL_SCHEDULES: ScheduleItem[] = initialDepartmentSchedules[department] || initialDepartmentSchedules['BS Information Technology'];
+  // Resolve matching student record
+  const matchedStudent =
+    students?.find(
+      (s) => s.email.toLowerCase() === currentUser.email.toLowerCase() || s.id === currentUser.id
+    ) ||
+    initialStudents.find(
+      (s) => s.email.toLowerCase() === currentUser.email.toLowerCase() || s.id === currentUser.id
+    );
+
+  const name = currentUser.name || matchedStudent?.name || 'STUDENT';
+  const email = currentUser.email || matchedStudent?.email || 'student@tcc.edu';
+  const department: Department = (currentUser.department ||
+    matchedStudent?.department ||
+    'BS Information Technology') as Department;
+
+  const ALL_SCHEDULES: ScheduleItem[] =
+    initialDepartmentSchedules[department] ||
+    initialDepartmentSchedules['BS Information Technology'];
+
+  const uniqueSubjects = Array.from(
+    new Map(ALL_SCHEDULES.map((item) => [item.code, item])).values()
+  );
+  const totalEnrolledUnits = uniqueSubjects.reduce(
+    (acc, curr) => acc + (curr.units || 3),
+    0
+  );
+  const studentGpa = matchedStudent?.gpa ? matchedStudent.gpa.toFixed(2) : '1.25';
+  const studentAttendancePct = matchedStudent?.overallAttendance
+    ? `${matchedStudent.overallAttendance}%`
+    : '98%';
+
+  const currentAssessment =
+    DEPARTMENT_ASSESSMENTS[department] ||
+    DEPARTMENT_ASSESSMENTS['BS Information Technology'];
+  const myGrades =
+    DEPARTMENT_GRADES_DATA[department] ||
+    DEPARTMENT_GRADES_DATA['BS Information Technology'];
+  const myAttendance =
+    DEPARTMENT_ATTENDANCE_DATA[department] ||
+    DEPARTMENT_ATTENDANCE_DATA['BS Information Technology'];
+  const departmentGpaInfo =
+    DEPARTMENT_GPA_TREND[department] ||
+    DEPARTMENT_GPA_TREND['BS Information Technology'];
 
   const [avatarUrl, setAvatarUrl] = useState(
-    currentUser.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+    currentUser.avatar || matchedStudent?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
   );
-  const [studentNo, setStudentNo] = useState('00005555');
+  const [studentNo, setStudentNo] = useState(matchedStudent?.studentNo || 'TCC-2024-001');
   const [fullName, setFullName] = useState(name);
   const [instEmail, setInstEmail] = useState(email);
-  const [personalEmail, setPersonalEmail] = useState(email);
-  const [contactNo, setContactNo] = useState('09123456789');
-  const [courseYear, setCourseYear] = useState(`${department} • 2nd Year`);
-  const [street, setStreet] = useState('123 Taguig City College Rd.');
-  const [barangay, setBarangay] = useState('Brgy. Central');
-  const [city, setCity] = useState('Taguig City');
-  const [province, setProvince] = useState('Metro Manila');
-  const [zipCode, setZipCode] = useState('1630');
-  const [emergencyName, setEmergencyName] = useState('Mrs. Ampoyo');
-  const [emergencyRelation, setEmergencyRelation] = useState('Parent / Guardian');
-  const [emergencyPhone, setEmergencyPhone] = useState('09987654321');
+  const [personalEmail, setPersonalEmail] = useState(matchedStudent?.personalEmail || email);
+  const [contactNo, setContactNo] = useState(matchedStudent?.contactNumber || '09123456789');
+  const [courseYear, setCourseYear] = useState(`${department} • ${matchedStudent?.yearLevel || '2nd Year'}`);
+  const [street, setStreet] = useState(matchedStudent?.address?.street || '123 Taguig City College Rd.');
+  const [barangay, setBarangay] = useState(matchedStudent?.address?.barangay || 'Brgy. Central');
+  const [city, setCity] = useState(matchedStudent?.address?.city || 'Taguig City');
+  const [province, setProvince] = useState(matchedStudent?.address?.province || 'Metro Manila');
+  const [zipCode, setZipCode] = useState(matchedStudent?.address?.zipCode || '1630');
+  const [emergencyName, setEmergencyName] = useState(matchedStudent?.emergencyContact?.name || 'Mrs. Santos');
+  const [emergencyRelation, setEmergencyRelation] = useState(matchedStudent?.emergencyContact?.relationship || 'Parent / Guardian');
+  const [emergencyPhone, setEmergencyPhone] = useState(matchedStudent?.emergencyContact?.contactNumber || '09987654321');
+
+  useEffect(() => {
+    if (matchedStudent) {
+      setStudentNo(matchedStudent.studentNo);
+      setFullName(currentUser.name || matchedStudent.name);
+      setInstEmail(currentUser.email || matchedStudent.email);
+      setPersonalEmail(matchedStudent.personalEmail || currentUser.email);
+      setContactNo(matchedStudent.contactNumber || '09123456789');
+      setCourseYear(`${department} • ${matchedStudent.yearLevel || '2nd Year'}`);
+      if (currentUser.avatar || matchedStudent.avatar) {
+        setAvatarUrl(currentUser.avatar || matchedStudent.avatar);
+      }
+      if (matchedStudent.address) {
+        setStreet(matchedStudent.address.street || '');
+        setBarangay(matchedStudent.address.barangay || '');
+        setCity(matchedStudent.address.city || '');
+        setProvince(matchedStudent.address.province || '');
+        setZipCode(matchedStudent.address.zipCode || '');
+      }
+      if (matchedStudent.emergencyContact) {
+        setEmergencyName(matchedStudent.emergencyContact.name || '');
+        setEmergencyRelation(matchedStudent.emergencyContact.relationship || '');
+        setEmergencyPhone(matchedStudent.emergencyContact.contactNumber || '');
+      }
+    }
+  }, [currentUser, matchedStudent, department]);
+
+  useEffect(() => {
+    setStudentNotifs(
+      DEPARTMENT_NOTIFICATIONS[department] || DEPARTMENT_NOTIFICATIONS['BS Information Technology']
+    );
+  }, [department]);
 
   // Password Security Form
   const [currentPassword, setCurrentPassword] = useState('');
@@ -556,7 +1241,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             My Class Schedule
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            Daily Academic Schedule Breakdown • 26 Enrolled Units
+            Daily Academic Schedule Breakdown • {totalEnrolledUnits} Enrolled Units
           </p>
         </div>
 
@@ -607,12 +1292,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <span className="text-xs text-blue-200 font-mono">2nd Semester A.Y. 2025-2026</span>
             </div>
             <h3 className="text-lg font-black tracking-tight text-white">
-              ITCC 5 — Midterm Examination (Information Management & Architecture)
+              {currentAssessment.code} — {currentAssessment.examType} ({currentAssessment.courseTitle})
             </h3>
             <p className="text-xs text-slate-300 flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span>📅 August 18, 2026 • 9:00 AM - 10:30 AM</span>
-              <span>📍 Lab 1 (Computer Center)</span>
-              <span>Proctor: Prof. April Jean D. Villas</span>
+              <span>📅 {currentAssessment.dateStr}</span>
+              <span>📍 {currentAssessment.room}</span>
+              <span>Proctor: {currentAssessment.proctor}</span>
             </p>
           </div>
 
@@ -641,7 +1326,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             </div>
 
             <button
-              onClick={() => setSelectedSyllabusCode('ITCC 5')}
+              onClick={() => setSelectedSyllabusCode(currentAssessment.syllabusCode)}
               className="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center space-x-1.5 shrink-0"
             >
               <FileText className="w-4 h-4" />
@@ -734,7 +1419,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-1"></span> IT Courses
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-1"></span>
+            {department === 'BS Criminology'
+              ? 'Criminology Courses'
+              : department === 'BS Business Administration'
+              ? 'Business Courses'
+              : 'IT Courses'}
           </span>
           <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 font-bold">
             <span className="w-2 h-2 rounded-full bg-blue-500 inline-block mr-1"></span> GE Courses
@@ -896,17 +1586,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           </div>
           <div className="flex items-center space-x-2">
             <span className="px-3 py-1 rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 text-xs font-black font-mono border border-emerald-200 dark:border-emerald-800">
-              Current GPA: 1.25
+              Current GPA: {studentGpa}
             </span>
             <span className="px-3 py-1 rounded-xl bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300 text-xs font-black font-mono border border-blue-200 dark:border-blue-800">
-              Magna Cum Laude
+              {departmentGpaInfo.standing}
             </span>
           </div>
         </div>
 
         <div className="h-64 w-full pt-2">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={GPA_TREND_DATA} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
+            <AreaChart data={departmentGpaInfo.trend} margin={{ top: 10, right: 20, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gpaTrendGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
@@ -978,7 +1668,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {MY_GRADES_DATA.map((row, i) => (
+            {myGrades.map((row, i) => (
               <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
                 <td className="p-3.5 font-bold text-slate-900 dark:text-white">{row.code}</td>
                 <td className="p-3.5 text-slate-700 dark:text-slate-300 font-medium">{row.desc}</td>
@@ -1015,7 +1705,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       </div>
 
       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {MY_ATTENDANCE_DATA.map((item, idx) => (
+        {myAttendance.map((item, idx) => (
           <div key={idx} className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-3">
             <div className="flex justify-between items-start">
               <div>
@@ -1480,17 +2170,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <div className="flex items-center space-x-3 w-full">
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 text-center flex-1 md:w-28">
                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">GPA</div>
-                <div className="text-xl font-black text-emerald-400 font-mono">1.25</div>
+                <div className="text-xl font-black text-emerald-400 font-mono">{studentGpa}</div>
               </div>
 
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 text-center flex-1 md:w-28">
                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Units</div>
-                <div className="text-xl font-black text-white font-mono">26</div>
+                <div className="text-xl font-black text-white font-mono">{totalEnrolledUnits}</div>
               </div>
 
               <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 text-center flex-1 md:w-28">
                 <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Attendance</div>
-                <div className="text-xl font-black text-blue-400 font-mono">100%</div>
+                <div className="text-xl font-black text-blue-400 font-mono">{studentAttendancePct}</div>
               </div>
             </div>
           </div>
@@ -1558,18 +2248,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
           <UserIcon className="w-3.5 h-3.5" />
           <span>Profile Management</span>
         </button>
-
-        <button
-          onClick={() => setActiveTab('notifications')}
-          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-            activeTab === 'notifications'
-              ? 'bg-slate-900 text-white dark:bg-blue-600'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-          }`}
-        >
-          <Bell className="w-3.5 h-3.5 text-blue-400" />
-          <span>Notifications</span>
-        </button>
       </div>
 
       {/* Active Tab View */}
@@ -1578,39 +2256,27 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
       {activeTab === 'grades' && renderGradesContent()}
       {activeTab === 'attendance' && renderAttendanceContent()}
       {activeTab === 'profile' && renderProfileContent()}
-      {activeTab === 'notifications' && (
-        <div className="space-y-4 pt-4">
-          <h2 className="text-xl font-black text-slate-900 dark:text-white">System Updates & Push Alerts</h2>
-          {notifications.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">No updates available.</p>
-          ) : (
-            notifications.map((notif) => (
-              <div key={notif.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs">
-                <h4 className="font-bold text-slate-900 dark:text-white text-xs">{notif.title}</h4>
-                <p className="text-slate-600 dark:text-slate-300 mt-1 text-xs">{notif.message}</p>
-                <span className="text-[10px] text-slate-400 mt-2 block font-mono">{notif.timestamp}</span>
-              </div>
-            ))
-          )}
-        </div>
-      )}
 
       {/* View Syllabus Modal */}
       {selectedSyllabusCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 max-w-2xl w-full text-slate-900 dark:text-slate-100 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto">
             {(() => {
+              const matchedClass = ALL_SCHEDULES.find((s) => s.code === selectedSyllabusCode);
               const syl = SYLLABUS_DATA[selectedSyllabusCode] || {
                 code: selectedSyllabusCode,
-                title: 'Official Course Syllabus',
-                department: 'Torres Capitol College Academic Department',
-                units: 3,
-                instructorName: 'Faculty Instructor',
+                title: matchedClass?.title || 'Official Course Syllabus',
+                department: matchedClass?.department || department,
+                units: matchedClass?.units || 3,
+                instructorName: matchedClass?.instructor || 'Faculty Instructor',
                 instructorEmail: 'faculty@tcc.edu.ph',
-                officeLocation: 'Academic Faculty Office',
+                officeLocation: matchedClass?.room ? `${matchedClass.room} Complex` : 'Academic Faculty Office',
                 consultationHours: 'Regular Office Hours',
-                description: 'Comprehensive course covering key theoretical concepts, lab exercises, and practical assessment criteria.',
-                objectives: ['Master fundamental subject matter concepts.', 'Apply practical techniques in lab assignments.'],
+                description: `Comprehensive academic coursework for ${matchedClass?.title || selectedSyllabusCode}, detailing course competencies, syllabus guidelines, and evaluation metrics.`,
+                objectives: [
+                  `Master fundamental subject matter concepts and competencies in ${matchedClass?.title || selectedSyllabusCode}.`,
+                  'Apply practical methodologies, research standards, and academic best practices.'
+                ],
                 gradingScheme: [
                   { category: 'Prelim Assessment', weight: 20 },
                   { category: 'Midterm Assessment', weight: 25 },
