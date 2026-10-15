@@ -12,13 +12,16 @@ import {
   LogIn,
   Menu,
   Wifi,
+  Sparkles,
   Search,
   X,
   Sun,
   Moon,
   Laptop,
   Check,
+  MessageSquare,
   Clock,
+  Smartphone,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -32,7 +35,7 @@ interface HeaderProps {
   onToggleSidebarMobile: () => void;
   onForceSync: () => void;
   isSyncing: boolean;
-  onOpenAiAssistant?: () => void;
+  onOpenAiAssistant: () => void;
   onOpenApkModal?: () => void;
   students?: Student[];
   onSelectStudent?: (studentId: string) => void;
@@ -49,6 +52,8 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebarMobile,
   onForceSync,
   isSyncing,
+  onOpenAiAssistant,
+  onOpenApkModal,
   students = [],
   onSelectStudent,
 }) => {
@@ -85,21 +90,15 @@ export const Header: React.FC<HeaderProps> = ({
     { mode: 'system', label: 'System Default', icon: Laptop },
   ];
 
-  // Filter students by name or ID for quick lookup, scoped to department for non-admin staff
+  // Filter students by name or ID for quick lookup
   const searchResults = searchQuery.trim()
-    ? students
-        .filter((s) => {
-          if (currentUser?.role && currentUser.role !== 'Admin' && currentUser.department) {
-            if (s.department !== currentUser.department) return false;
-          }
-          return (
-            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.studentNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            s.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (s.contactNumber && s.contactNumber.includes(searchQuery))
-          );
-        })
-        .slice(0, 5)
+    ? students.filter(
+        (s) =>
+          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.studentNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          s.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (s.contactNumber && s.contactNumber.includes(searchQuery))
+      ).slice(0, 5)
     : [];
 
   useEffect(() => {
@@ -161,11 +160,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="text-xs font-black tracking-wide text-white leading-tight flex items-center space-x-1.5">
                   <span className="truncate max-w-[120px]">{currentUser.name}</span>
                   <span className="text-[10px] font-normal text-slate-300 bg-slate-800 px-1.5 py-0.2 rounded font-mono hidden md:inline">
-                    {currentUser.role === 'Student'
-                      ? 'Student'
-                      : currentUser.role === 'Admin'
-                      ? 'System Administrator'
-                      : `${currentUser.role} • ${currentUser.department?.replace('BS ', '') || 'Faculty'}`}
+                    {currentUser.role === 'Student' ? 'Student' : 'System Administrator'}
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-medium font-mono leading-tight truncate max-w-[160px]">
@@ -250,7 +245,28 @@ export const Header: React.FC<HeaderProps> = ({
             <span>Sat • Aug 15, 1:36:23 PM</span>
           </div>
 
+          {/* Mobile & Desktop APK Download Button */}
+          {onOpenApkModal && (
+            <button
+              onClick={onOpenApkModal}
+              className="flex items-center space-x-1 px-2.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs shrink-0"
+              title="Download Android APK for Manual Sideloading"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
+              <span className="hidden sm:inline">Get APK</span>
+              <span className="sm:hidden text-[10px]">APK</span>
+            </button>
+          )}
 
+          {/* AI Analyst Button */}
+          <button
+            onClick={onOpenAiAssistant}
+            className="flex items-center space-x-1 px-3 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs"
+            title="Open AI Assistant"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span className="hidden xl:inline">AI Analyst</span>
+          </button>
 
           {/* Theme Selector */}
           <div className="relative" ref={themeMenuRef}>
@@ -318,6 +334,14 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </button>
 
+          {/* Chat / Messages Button */}
+          <button
+            onClick={onOpenNotifications}
+            className="p-2 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition"
+            title="Messages"
+          >
+            <MessageSquare className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+          </button>
 
           {/* Logout Button */}
           {currentUser ? (

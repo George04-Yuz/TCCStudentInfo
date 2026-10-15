@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Student, Course, AuditLogEntry, Language, Department, GradeItem, User } from '../types';
+import { Student, Course, AuditLogEntry, Language, Department, GradeItem } from '../types';
 import { t } from '../utils/i18n';
 import { percentageToPhGrade } from '../utils/philippineGrading';
 import {
@@ -54,10 +54,6 @@ interface DashboardOverviewProps {
   auditLogs: AuditLogEntry[];
   currentLang: Language;
   selectedDepartment: string;
-  currentUser?: User | null;
-  userRole?: string;
-  userDepartment?: string;
-  onSelectDepartment?: (dept: string) => void;
   onNavigateTab: (tab: string) => void;
   onOpenAiAnalyst: () => void;
   onTriggerIntervention: (student: Student) => void;
@@ -81,20 +77,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   auditLogs,
   currentLang,
   selectedDepartment,
-  currentUser,
-  userRole,
-  userDepartment,
-  onSelectDepartment,
   onNavigateTab,
   onOpenAiAnalyst,
   onTriggerIntervention,
   onSelectStudent,
 }) => {
-  const isAdmin = currentUser?.role === 'Admin' || userRole === 'Admin';
-  const effectiveDept = isAdmin
-    ? selectedDepartment
-    : (userDepartment || currentUser?.department || selectedDepartment || 'BS Information Technology');
-
   const [searchQuery, setSearchQuery] = useState('');
   const [chartMetric, setChartMetric] = useState<'grade' | 'department'>('grade');
   const [isSimulating, setIsSimulating] = useState(false);
@@ -188,9 +175,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   // Recent Grades Dataset for Faculty Widget
   const recentGradesList = useMemo(() => {
     let targetGrades = grades;
-    if (effectiveDept !== 'All Departments') {
-      const deptStudentIds = students.filter((s) => s.department === effectiveDept).map((s) => s.id);
-      targetGrades = grades.filter((g) => deptStudentIds.includes(g.studentId));
+    if (selectedDepartment !== 'All Departments') {
+      const deptStudentIds = students.filter(s => s.department === selectedDepartment).map(s => s.id);
+      targetGrades = grades.filter(g => deptStudentIds.includes(g.studentId));
     }
     if (targetGrades && targetGrades.length > 0) {
       return targetGrades.slice(0, 5).map((g) => {
@@ -214,23 +201,20 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
       });
     }
 
-    const allFallbackGrades = [
-      { id: 'rg-1', dept: 'BS Information Technology', studentName: 'Aria Sofia Castillo', studentNo: 'TCC-2026-101', courseCode: 'IT-301', category: 'Midterm Exam', score: 92, maxScore: 100, scorePct: 92, phLabel: '1.25 (Very Good)', phNumeric: 1.25, status: 'Verified & Approved', date: 'Aug 14' },
-      { id: 'rg-2', dept: 'BS Criminology', studentName: 'Dominic James Alonzo', studentNo: 'TCC-2026-102', courseCode: 'CRIM-101', category: 'Laboratory 3', score: 88, maxScore: 100, scorePct: 88, phLabel: '1.75 (Good)', phNumeric: 1.75, status: 'Verified & Approved', date: 'Aug 14' },
-      { id: 'rg-3', dept: 'BS Business Administration', studentName: 'Isabella Marie Cruz', studentNo: 'TCC-2026-103', courseCode: 'BA-201', category: 'Case Study 1', score: 76, maxScore: 100, scorePct: 76, phLabel: '2.50 (Fair)', phNumeric: 2.50, status: 'Needs Review', date: 'Aug 13' },
-      { id: 'rg-4', dept: 'BS Information Technology', studentName: 'Mateo Gabriel Silva', studentNo: 'TCC-2026-104', courseCode: 'IT-301', category: 'Quiz 2', score: 98, maxScore: 100, scorePct: 98, phLabel: '1.00 (Excellent)', phNumeric: 1.00, status: 'Verified & Approved', date: 'Aug 13' },
-      { id: 'rg-5', dept: 'BS Business Administration', studentName: 'Clara Jane Bennett', studentNo: 'TCC-2026-105', courseCode: 'BA-201', category: 'Midterm Exam', score: 68, maxScore: 100, scorePct: 68, phLabel: '3.00 (Passing)', phNumeric: 3.00, status: 'Academic Alert', date: 'Aug 12' },
+    return [
+      { id: 'rg-1', studentName: 'Aria Sofia Castillo', studentNo: 'TCC-2026-101', courseCode: 'IT-301', category: 'Midterm Exam', score: 92, maxScore: 100, scorePct: 92, phLabel: '1.25 (Very Good)', phNumeric: 1.25, status: 'Verified & Approved', date: 'Aug 14' },
+      { id: 'rg-2', studentName: 'Dominic James Alonzo', studentNo: 'TCC-2026-102', courseCode: 'CRIM-101', category: 'Laboratory 3', score: 88, maxScore: 100, scorePct: 88, phLabel: '1.75 (Good)', phNumeric: 1.75, status: 'Verified & Approved', date: 'Aug 14' },
+      { id: 'rg-3', studentName: 'Isabella Marie Cruz', studentNo: 'TCC-2026-103', courseCode: 'BA-201', category: 'Case Study 1', score: 76, maxScore: 100, scorePct: 76, phLabel: '2.50 (Fair)', phNumeric: 2.50, status: 'Needs Review', date: 'Aug 13' },
+      { id: 'rg-4', studentName: 'Mateo Gabriel Silva', studentNo: 'TCC-2026-104', courseCode: 'IT-301', category: 'Quiz 2', score: 98, maxScore: 100, scorePct: 98, phLabel: '1.00 (Excellent)', phNumeric: 1.00, status: 'Verified & Approved', date: 'Aug 13' },
+      { id: 'rg-5', studentName: 'Clara Jane Bennett', studentNo: 'TCC-2026-105', courseCode: 'BA-201', category: 'Midterm Exam', score: 68, maxScore: 100, scorePct: 68, phLabel: '3.00 (Passing)', phNumeric: 3.00, status: 'Academic Alert', date: 'Aug 12' },
     ];
-    return effectiveDept === 'All Departments'
-      ? allFallbackGrades
-      : allFallbackGrades.filter((g) => g.dept === effectiveDept);
-  }, [grades, students, effectiveDept]);
+  }, [grades, students, selectedDepartment]);
 
   // Course Attendance Summary Dataset for Faculty Widget
   const courseAttendanceSummaryList = useMemo(() => {
-    const targetCourses = effectiveDept === 'All Departments'
+    const targetCourses = selectedDepartment === 'All Departments'
       ? courses
-      : courses.filter((c) => c.department === effectiveDept);
+      : courses.filter(c => c.department === selectedDepartment);
 
     return targetCourses.map((c) => {
       const courseStudents = students.filter((s) => s.department === c.department);
@@ -251,11 +235,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
         status: avgAtt >= 90 ? 'High Compliance' : avgAtt >= 80 ? 'Satisfactory' : 'Needs Review',
       };
     });
-  }, [courses, students, effectiveDept]);
+  }, [courses, students, selectedDepartment]);
 
-  // Filter students based on effective department
+  // Filter students based on selected department
   const filteredStudents = students.filter((s) => {
-    const matchesDept = effectiveDept === 'All Departments' || s.department === effectiveDept;
+    const matchesDept = selectedDepartment === 'All Departments' || s.department === selectedDepartment;
     const matchesSearch =
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.studentNo.toLowerCase().includes(searchQuery.toLowerCase());
@@ -276,10 +260,6 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
     { dept: 'BS Business Administration', avgGpa: 1.75, attendance: 91, total: 45 },
     { dept: 'BS Criminology', avgGpa: 2.0, attendance: 88, total: 42 },
   ];
-
-  const displayDepartmentMetrics = effectiveDept === 'All Departments'
-    ? departmentMetrics
-    : departmentMetrics.filter((dm) => dm.dept === effectiveDept);
 
   // Semester Performance Trends dataset for Recharts
   const semesterPerformanceTrends = [
@@ -928,9 +908,9 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
   );
 
   const renderDepartmentSchedulesWidget = () => {
-    const deptsToDisplay = effectiveDept === 'All Departments' 
+    const deptsToDisplay = selectedDepartment === 'All Departments' 
       ? Object.keys(initialDepartmentSchedules) as Department[]
-      : [effectiveDept as Department];
+      : [selectedDepartment as Department];
 
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-4 transition-colors">
@@ -939,7 +919,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Class Subjects & Schedules ({effectiveDept === 'All Departments' ? 'All Departments' : effectiveDept})
+                Class Subjects & Schedules ({selectedDepartment === 'All Departments' ? 'All Departments' : selectedDepartment})
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-sans">
                 Official weekly schedule, rooms, and assigned instructors for the selected department
@@ -947,7 +927,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             </div>
           </div>
           <span className="px-3 py-1 bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 font-mono text-xs font-bold rounded-xl border border-blue-200 dark:border-blue-800">
-            {effectiveDept === 'All Departments' ? 'All Depts Active' : effectiveDept}
+            {selectedDepartment === 'All Departments' ? 'All Depts Active' : selectedDepartment}
           </span>
         </div>
 
@@ -956,7 +936,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
             const schedules = initialDepartmentSchedules[dept] || [];
             return (
               <div key={dept} className="space-y-3">
-                {effectiveDept === 'All Departments' && (
+                {selectedDepartment === 'All Departments' && (
                   <div className="flex items-center space-x-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                     <Building2 className="w-4 h-4 text-indigo-500" />
                     <h4 className="text-sm font-black text-slate-900 dark:text-white">{dept}</h4>
@@ -1049,40 +1029,11 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
               Executive Dashboard & Real-Time Sync
             </h2>
             <p className="text-xs md:text-sm text-slate-300 mt-1 max-w-2xl">
-              {isAdmin
-                ? 'System Administrator multi-department academic oversight, roster tracking, and synchronized operations.'
-                : `${effectiveDept} Academic Portal — viewing student records, rosters, and operational metrics exclusively for ${effectiveDept}.`}
+              Real-time student metrics, grade compliance oversight, and cross-department synchronization active across all campuses.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            {/* Optional Department Filter Dropdown for Admin */}
-            {isAdmin ? (
-              <div className="flex items-center space-x-2 bg-slate-800/90 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white shadow-xs">
-                <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Dept:</span>
-                <select
-                  value={effectiveDept}
-                  onChange={(e) => onSelectDepartment?.(e.target.value)}
-                  className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer"
-                  aria-label="Department Filter"
-                >
-                  <option value="All Departments" className="bg-slate-900 text-white">🌐 All Departments</option>
-                  <option value="BS Information Technology" className="bg-slate-900 text-white">BS Information Technology</option>
-                  <option value="BS Criminology" className="bg-slate-900 text-white">BS Criminology</option>
-                  <option value="BS Business Administration" className="bg-slate-900 text-white">BS Business Administration</option>
-                </select>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2 bg-blue-950/80 border border-blue-800/80 rounded-xl px-3.5 py-2 text-xs text-blue-200 font-bold shadow-xs">
-                <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
-                <span>{effectiveDept}</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-900 text-blue-300 uppercase font-mono tracking-wider">
-                  Department Scoped
-                </span>
-              </div>
-            )}
-
             <button
               onClick={() => onNavigateTab('import')}
               className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
@@ -1220,7 +1171,7 @@ export const DashboardOverview: React.FC<DashboardOverviewProps> = ({
           </div>
 
           <div className="space-y-3.5">
-            {displayDepartmentMetrics.map((dm) => (
+            {departmentMetrics.map((dm) => (
               <div key={dm.dept} className="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-xl border border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between text-xs mb-1.5 font-medium">
                   <span className="text-slate-800 dark:text-slate-200 font-bold">{dm.dept}</span>

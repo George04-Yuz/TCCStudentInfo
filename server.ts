@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import { sendVerificationEmail, verifySmtpConfiguration } from './src/services/serverEmailService';
 
 dotenv.config({ override: true });
+// Seamlessly load from .env.example as a fallback if .env is missing or deleted
 dotenv.config({ path: path.join(process.cwd(), '.env.example'), override: true });
 
 const app = express();
@@ -13,8 +14,10 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
+// Global SMTP Server Status (populated during startup check)
 let smtpServerStatus: { ready: boolean; user: string; error?: string } = { ready: false, user: '' };
 
+// In-Memory OTP Store: email -> { code, expiresAt, createdAt, name }
 interface OtpRecord {
   code: string;
   expiresAt: number;
@@ -23,6 +26,7 @@ interface OtpRecord {
 }
 const otpStore = new Map<string, OtpRecord>();
 
+// API Route: Check SMTP Connection Status
 app.get('/api/smtp-status', (req, res) => {
   res.json({
     success: true,
@@ -30,6 +34,7 @@ app.get('/api/smtp-status', (req, res) => {
   });
 });
 
+// API Route: Send Real Verification Code to Inbox
 app.post('/api/send-verification-code', async (req, res) => {
   try {
     const { email, name } = req.body;
@@ -46,7 +51,9 @@ app.post('/api/send-verification-code', async (req, res) => {
     const now = Date.now();
     const existing = otpStore.get(cleanEmail);
 
+    // Server-side Deduplication: Prevent sending multiple emails to the same address within 30 seconds
     if (existing && (now - existing.createdAt < 30000)) {
+      console.log(`[Deduplication] Prevented duplicate email dispatch to ${cleanEmail}. Sent ${Math.round((now - existing.createdAt) / 1000)}s ago.`);
       res.json({
         success: true,
         message: `A security verification code has been sent directly to ${cleanEmail}. Please check your email inbox.`,
@@ -58,7 +65,7 @@ app.post('/api/send-verification-code', async (req, res) => {
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = now + 10 * 60 * 1000;
+    const expiresAt = now + 10 * 60 * 1000; // 10 minutes
 
     otpStore.set(cleanEmail, { code, expiresAt, createdAt: now, name });
 
@@ -82,6 +89,7 @@ app.post('/api/send-verification-code', async (req, res) => {
   }
 });
 
+// API Route: Verify Student OTP Code
 app.post('/api/verify-code', (req, res) => {
   const { email, code } = req.body;
   if (!email || !code) {
@@ -96,6 +104,7 @@ app.post('/api/verify-code', (req, res) => {
   const cleanEmail = email.trim().toLowerCase();
   const cleanCode = code.toString().trim();
 
+  // Allow standard master code 123456
   if (cleanCode === '123456') {
     res.json({ success: true, verified: true, message: 'Master code verified.' });
     return;
@@ -130,10 +139,12 @@ app.post('/api/verify-code', (req, res) => {
     return;
   }
 
+  // Clear OTP on successful verification
   otpStore.delete(cleanEmail);
   res.json({ success: true, verified: true, message: 'Verification successful.' });
 });
 
+// Initialize Gemini Client
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -149,6 +160,7 @@ const getGeminiClient = () => {
   });
 };
 
+// API Health
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -158,6 +170,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// AI Performance & Risk Analysis Route
 app.post('/api/ai/analyze-performance', async (req, res) => {
   try {
     const { students, department, course } = req.body;
@@ -174,7 +187,7 @@ Please provide a concise, highly professional academic review formatted in Markd
 4. **Accreditation Note**: Compliance readiness status.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
       config: {
         systemInstruction: 'You are an academic compliance & student success analyst for Torres Capitol College.',
@@ -191,6 +204,7 @@ Please provide a concise, highly professional academic review formatted in Markd
   }
 });
 
+// AI Compliance & Accreditation Report Generator Route
 app.post('/api/ai/generate-compliance-report', async (req, res) => {
   try {
     const { month, year, department, metrics } = req.body;
@@ -208,7 +222,7 @@ Provide a formal executive compliance statement for administrative oversight & a
 - **Section IV: System Reliability, RBAC & Encryption Attestation**`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.6-flash',
       contents: prompt,
     });
 
@@ -223,6 +237,7 @@ Provide a formal executive compliance statement for administrative oversight & a
 });
 
 async function startServer() {
+  // Execute startup SMTP connection check
   console.log('🔍 Testing SMTP Server connection configuration...');
   smtpServerStatus = await verifySmtpConfiguration();
 
@@ -233,14 +248,20 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(process.cwd(), 'dist')));
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+      res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running at http://0.0.0.0:${PORT}`);
+    console.log(`Torres Capitol College SIS server running on http://0.0.0.0:${PORT}`);
+    if (smtpServerStatus.ready) {
+      console.log(`📧 SMTP Transport Engine Ready: Active for ${smtpServerStatus.user}`);
+    } else {
+      console.warn(`⚠️ SMTP Transport Warning: ${smtpServerStatus.error}`);
+    }
   });
 }
 
