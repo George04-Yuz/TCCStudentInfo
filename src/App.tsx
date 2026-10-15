@@ -274,6 +274,13 @@ export default function App() {
           setCurrentUser(user);
           addAuditEntry('MFA_LOGIN_SUCCESS', `User ${user.name} logged in with verified email OTP code`);
 
+          // Auto-detect and filter by department based on profile role and department
+          if (user.role === 'Admin') {
+            setSelectedDepartment('All Departments');
+          } else if (user.department) {
+            setSelectedDepartment(user.department);
+          }
+
           if (newStudent) {
             setStudents((prev) => {
               if (prev.some((s) => s.id === newStudent.id || s.studentNo === newStudent.studentNo)) {
@@ -324,6 +331,11 @@ export default function App() {
     );
   }
 
+  const isAdmin = currentUser?.role === 'Admin';
+  const effectiveDepartment = isAdmin
+    ? selectedDepartment
+    : (currentUser?.department || selectedDepartment || 'BS Information Technology');
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans selection:bg-blue-600 selection:text-white transition-colors">
       {/* Top Header */}
@@ -359,7 +371,7 @@ export default function App() {
           permissions={userPermissions}
           isOpenMobile={isOpenSidebarMobile}
           onCloseMobile={() => setIsOpenSidebarMobile(false)}
-          selectedDepartment={selectedDepartment}
+          selectedDepartment={effectiveDepartment}
           onSelectDepartment={setSelectedDepartment}
           onOpenApkModal={() => setShowApkModal(true)}
         />
@@ -385,7 +397,11 @@ export default function App() {
               grades={grades}
               auditLogs={auditLogs}
               currentLang={currentLang}
-              selectedDepartment={selectedDepartment}
+              selectedDepartment={effectiveDepartment}
+              currentUser={currentUser}
+              userRole={currentUser?.role}
+              userDepartment={currentUser?.department}
+              onSelectDepartment={setSelectedDepartment}
               onNavigateTab={setActiveTab}
               onOpenAiAnalyst={() => setShowAiModal(true)}
               onTriggerIntervention={handleTriggerIntervention}
@@ -403,7 +419,7 @@ export default function App() {
               instructors={instructors}
               departmentSchedules={initialDepartmentSchedules}
               currentUser={currentUser}
-              selectedDepartment={selectedDepartment}
+              selectedDepartment={effectiveDepartment}
               onAddCourse={(course) => {
                 setCourses((prev) => [course, ...prev]);
                 addAuditEntry('CURRICULUM_SUBJECT_ADDED', `Added course ${course.code} for ${course.department}`);

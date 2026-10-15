@@ -85,15 +85,21 @@ export const Header: React.FC<HeaderProps> = ({
     { mode: 'system', label: 'System Default', icon: Laptop },
   ];
 
-  // Filter students by name or ID for quick lookup
+  // Filter students by name or ID for quick lookup, scoped to department for non-admin staff
   const searchResults = searchQuery.trim()
-    ? students.filter(
-        (s) =>
-          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.studentNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.contactNumber && s.contactNumber.includes(searchQuery))
-      ).slice(0, 5)
+    ? students
+        .filter((s) => {
+          if (currentUser?.role && currentUser.role !== 'Admin' && currentUser.department) {
+            if (s.department !== currentUser.department) return false;
+          }
+          return (
+            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.studentNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            s.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (s.contactNumber && s.contactNumber.includes(searchQuery))
+          );
+        })
+        .slice(0, 5)
     : [];
 
   useEffect(() => {
@@ -155,7 +161,11 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="text-xs font-black tracking-wide text-white leading-tight flex items-center space-x-1.5">
                   <span className="truncate max-w-[120px]">{currentUser.name}</span>
                   <span className="text-[10px] font-normal text-slate-300 bg-slate-800 px-1.5 py-0.2 rounded font-mono hidden md:inline">
-                    {currentUser.role === 'Student' ? 'Student' : 'System Administrator'}
+                    {currentUser.role === 'Student'
+                      ? 'Student'
+                      : currentUser.role === 'Admin'
+                      ? 'System Administrator'
+                      : `${currentUser.role} • ${currentUser.department?.replace('BS ', '') || 'Faculty'}`}
                   </span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-medium font-mono leading-tight truncate max-w-[160px]">

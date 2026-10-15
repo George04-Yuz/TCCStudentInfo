@@ -1067,9 +1067,34 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
 
   const name = currentUser.name || matchedStudent?.name || 'STUDENT';
   const email = currentUser.email || matchedStudent?.email || 'student@tcc.edu';
-  const department: Department = (currentUser.department ||
-    matchedStudent?.department ||
-    'BS Information Technology') as Department;
+  const resolveStudentDepartment = (): Department => {
+    if (
+      currentUser.department &&
+      (currentUser.department === 'BS Criminology' ||
+        currentUser.department === 'BS Business Administration' ||
+        currentUser.department === 'BS Information Technology')
+    ) {
+      return currentUser.department as Department;
+    }
+    if (
+      matchedStudent?.department &&
+      (matchedStudent.department === 'BS Criminology' ||
+        matchedStudent.department === 'BS Business Administration' ||
+        matchedStudent.department === 'BS Information Technology')
+    ) {
+      return matchedStudent.department as Department;
+    }
+    const emailLower = (currentUser.email || '').toLowerCase();
+    if (emailLower.includes('xernex02') || emailLower.includes('crim')) {
+      return 'BS Criminology';
+    }
+    if (emailLower.includes('xernex03') || emailLower.includes('bsba') || emailLower.includes('business')) {
+      return 'BS Business Administration';
+    }
+    return 'BS Information Technology';
+  };
+
+  const department: Department = resolveStudentDepartment();
 
   const ALL_SCHEDULES: ScheduleItem[] =
     initialDepartmentSchedules[department] ||

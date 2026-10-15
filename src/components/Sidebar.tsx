@@ -111,7 +111,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Web Integrated Smart School Management System
         </p>
         <div className="inline-block px-3 py-1 text-[9px] font-extrabold uppercase tracking-widest text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 rounded-full">
-          {currentUser?.role === 'Student' ? 'STUDENT' : 'SYSTEM ADMIN'}
+          {currentUser?.role === 'Student'
+            ? 'STUDENT'
+            : currentUser?.role === 'Admin'
+            ? 'SYSTEM ADMIN'
+            : `${currentUser?.role?.toUpperCase() || 'STAFF'} • ${currentUser?.department?.replace('BS ', '') || 'DEPT'}`}
         </div>
       </div>
 
@@ -141,7 +145,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {isDeptsExpanded && (
             <div className="p-2 pt-0 space-y-1 border-t border-slate-800/60 bg-slate-950/40 text-xs">
-              {departments.map((dept) => {
+              {(currentUser?.role === 'Admin'
+                ? departments
+                : departments.filter((d) => d === currentUser?.department)
+              ).map((dept) => {
                 const isSelectedDept = selectedDepartment === dept;
                 const isExpanded = expandedDeptName === dept;
 
@@ -329,3 +336,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </>
   );
 };
+
